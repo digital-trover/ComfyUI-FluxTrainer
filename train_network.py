@@ -1149,7 +1149,7 @@ class NetworkTrainer:
         self.save_model = save_model
         self.remove_model = remove_model
         self.comfy_pbar = None
-        
+
         progress_bar = tqdm(range(args.max_train_steps - initial_step), smoothing=0, disable=False, desc="steps")
         
         def training_loop(break_at_steps, epoch):
@@ -1316,6 +1316,21 @@ class NetworkTrainer:
                     break
                 steps_done += 1
                 self.comfy_pbar.update(1)
+
+                # Send custom training progress event to ComfyUI websocket
+                try:
+                    from server import PromptServer
+                    if PromptServer.instance is not None:
+                        PromptServer.instance.send_sync("training_progress", {
+                            "current_step": self.global_step,
+                            "total_steps": args.max_train_steps,
+                            "current_epoch": epoch + 1,
+                            "total_epochs": num_train_epochs,
+                            "loss": current_loss,
+                            "avg_loss": avr_loss,
+                        })
+                except:
+                    pass  # Silently fail if server is not available
 
             if len(accelerator.trackers) > 0:
                 logs = {"loss/epoch": self.loss_recorder.moving_average}
